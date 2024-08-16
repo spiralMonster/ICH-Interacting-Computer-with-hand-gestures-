@@ -3,6 +3,7 @@ import time
 import mediapipe as mp
 import numpy as np
 import math
+import os
 # Volume Adjuster libraries:
 from ctypes import cast,POINTER
 from comtypes import CLSCTX_ALL
@@ -71,112 +72,71 @@ while True:
         x18, y18 = landmark[18]
         x19, y19 = landmark[19]
         x20, y20 = landmark[20]
-        boundry=200
-        cv.circle(img,(x0,y0),boundry,(0,255,0),2)
+        margin=15
+        boundry=int(math.hypot(x9-x0,y9-y0))+margin
+        cv.circle(img,(x0,y0),int(boundry),(0,255,0),2)
+
+
         dist_zeroth_finger={}
         tip_points=[4,8,12,16,20]
         for ind,(x,y) in landmark.items():
             if ind in tip_points:
                 dist_zeroth_finger[ind] = math.hypot(x - x0, y - y0)
 
-        ##For sound Finger Number 8:
+        #For sound Finger Number 8:
         distances=dist_zeroth_finger.copy()
         length_seq_sound=math.hypot(x8-x4,y8-y4)
-        distances.pop(8)
         if all(item<boundry for item in distances.values()):
-            flag_sound=True
+            flag_sound=False
+        pop_items=[]
+        pop_items.append(distances.pop(8))
+        # pop_items.append(distances.pop(4))
+
+        if all(item<boundry for item in distances.values()) and all(item>boundry for item in pop_items):
+            if flag_bright:
+                flag_sound=False
+            else:
+                flag_sound=True
 
         if flag_sound:
             vol = np.interp(length_seq_sound, [20, 180], [min_vol, max_vol])
             volume.SetMasterVolumeLevel(vol, None)
-            rect_len = np.interp(vol, [min_vol, max_vol], [400,100])
+            vol=np.interp(vol,[-65,0],[0,100])
             cv.line(img, (x8, y8), (x4, y4), (0, 255, 0), 2)
             cv.circle(img, (int((x8 + x4) / 2), int((y8 + y4) / 2)), 5, (0, 0, 255), cv.FILLED)
-            cv.rectangle(img, (50, 100), (100, 400), (250, 206, 135), 2)
-            cv.rectangle(img,(100,400),(50,int(rect_len)),(250, 206, 135),cv.FILLED)
-            cv.putText(img,str(100),(40,100),cv.FONT_HERSHEY_PLAIN,1,(250, 206, 135),2)
-            cv.putText(img, str(0), (40, 400), cv.FONT_HERSHEY_PLAIN, 1, (250, 206, 135), 2)
-            cv.putText(img,"Adjusting Volume",(30,30),cv.FONT_HERSHEY_PLAIN,1,(250, 206, 135),1)
+            cv.putText(img,"Adjusting Volume",(30,30),cv.FONT_HERSHEY_PLAIN,1,(250, 206, 135),2)
+            cv.putText(img, f"Volume: {int(vol)}", (30, 50), cv.FONT_HERSHEY_PLAIN, 1, (250, 206, 135), 2)
 
+        ## For Brightness(40,350)
+        distances=dist_zeroth_finger.copy()
+        if all(item<boundry for item in distances.values()):
+            flag_bright=False
+        pop_items=[]
+        pop_items.append(distances.pop(8))
+        pop_items.append(distances.pop(12))
+        # pop_items.append(distances.pop(4))
+        if all(item<boundry for item in distances.values()) and all(item>boundry for item in pop_items):
+            if flag_sound:
+                flag_bright=False
+            else:
+                flag_bright=True
 
+        length_seq_bright=math.hypot(x12-x4,y12-y4)
+        if flag_bright:
+            brg=np.interp(length_seq_bright,[25,300],[0,100])
+            sbc.set_brightness(brg)
+            cv.line(img, (x12, y12), (x4, y4), (0, 255, 0), 2)
+            cv.circle(img, (int((x12 + x4) / 2), int((y12 + y4) / 2)), 5, (0, 0, 255), cv.FILLED)
+            cv.putText(img,f'Brightness: {int(brg)}',(30,50),cv.FONT_HERSHEY_PLAIN,1,(0,165,255),2)
+            cv.putText(img,"Adjusting Brightness",(30,30),cv.FONT_HERSHEY_PLAIN,1,(0,165,255),2)
 
+        #Sleep the PC:
+        distances=dist_zeroth_finger.copy()
+        pop_items=[]
+        pop_items.append(distances.pop(12))
+        if all(item>boundry for item in distances.values()) and all(item<boundry for item in pop_items):
+            os.system("rundll32.exe powrprof.dll,SetSuspendState Sleep")
 
-        # flag_sound=False
-        # flag_bright=False
-
-        # #Adjusting Sound:
-        # length_seq_sound=math.hypot(x8-x4,y8-y4)
-        # if length_seq_sound<30.0:
-        #     if flag_sound:
-        #         flag_sound=False
-        #     else:
-        #         flag_sound=True
-        #
-        # if flag_sound:
-        #     vol = np.interp(length_seq_sound, [30, 250], [min_vol, max_vol])
-        #     volume.SetMasterVolumeLevel(vol, None)
-        #     rect_len = np.interp(vol, [min_vol, max_vol], [400, 100])
-        #     cv.line(img, (x8, y8), (x4, y4), (0, 255, 0), 2)
-        #     cv.circle(img, (int((x8 + x4) / 2), int((y8 + y4) / 2)), 5, (0, 0, 255), cv.FILLED)
-        #     cv.rectangle(img, (50, 100), (100, 400), (250, 206, 135), 2)
-        #     cv.rectangle(img,(100,400),(50,int(rect_len)),(250, 206, 135),cv.FILLED)
-        #     cv.putText(img,str(100),(40,100),cv.FONT_HERSHEY_PLAIN,1,(250, 206, 135),2)
-        #     cv.putText(img, str(0), (40, 400), cv.FONT_HERSHEY_PLAIN, 1, (250, 206, 135), 2)
-        #     cv.putText(img,"Adjusting Volume",(30,30),cv.FONT_HERSHEY_PLAIN,1,(250, 206, 135),1)
-        #
-        # #Adjusting Brightness:
-        # length_seq_bright=math.hypot(x12-x4,y12-y4)
-        #print(length_seq_bright)
-        # if length_seq_bright<50.0:
-        #     if flag_bright:
-        #         flag_bright=False
-        #     else:
-        #         flag_bright=True
-        #
-        # if flag_bright:
-        #     length_seq = math.hypot(x12 - x4, y12 - y4)
-        #     br=np.interp(length_seq,[50,300],[0,100])
-        #     sbc.set_brightness(br)
-        #     cv.line(img,(x12,y12),(x4,y4),(0,255,0),2)
-        #     cv.circle(img, (int((x12 + x4) / 2), int((y12 + y4) / 2)), 5, (0, 0, 255), cv.FILLED)
-        #     cv.rectangle(img, (50, 100), (100, 400), (0,165,255), 2)
-        #     cv.rectangle(img, (100, 400), (50, int(br)), (0,165,255), cv.FILLED)
-        #     cv.putText(img, str(100), (40, 100), cv.FONT_HERSHEY_PLAIN, 1, (0,165,255), 2)
-        #     cv.putText(img, str(0), (40, 400), cv.FONT_HERSHEY_PLAIN, 1, (0,165,255), 2)
-        #     cv.putText(img,"Adjusting Brightness",(30,30),cv.FONT_HERSHEY_PLAIN,1,(0,165,255),2)
-
-
-
-
-
-
-
-        #30 for sound
-        # lengths_sound.append(math.hypot(x8-x4,y8-y4))
-        # lengths_bright.append(math.hypot(x12-x4,y12-y4))
-        # Adjusting Volume:
-        # x1, y1 = landmark[8]
-        # x2, y2 = landmark[4]
-        # cv.line(img,(x1,y1),(x2,y2),(0,255,0),2)
-        # cv.circle(img,(int((x1+x2)/2),int((y1+y2)/2)),5,(0,0,255),cv.FILLED)
-        # length_seq = math.hypot(x2 - x1, y2 - y1)
-        # # lengths.append(length_seq)
-        # vol=np.interp(length_seq,[30,250],[min_vol,max_vol])
-        # volume.SetMasterVolumeLevel(vol,None)
-        # rect_len=np.interp(vol,[min_vol,max_vol],[400,100])
-        # cv.rectangle(img, (50, 100), (100, 400), (0, 255, 0), 2)
-        # cv.rectangle(img,(100,400),(50,int(rect_len)),(0,255,0),cv.FILLED)
-        # cv.putText(img,str(100),(40,100),cv.FONT_HERSHEY_PLAIN,1,(200,125,150),2)
-        # cv.putText(img, str(0), (40, 400), cv.FONT_HERSHEY_PLAIN, 1, (200, 125, 150), 2)
-
-        #Adjusting Brightness:
-        # x1,y1=landmark[4]
-        # x2,y2=landmark[12]
-        # length_seq=math.hypot(x2-x1,y2-y1)
-        # br=np.interp(length_seq,[50,300],[0,100])
-        # sbc.set_brightness(br)
-        # cv.line(img,(x1,y1),(x2,y2),(0,255,0),2)
-        # cv.circle(img, (int((x1 + x2) / 2), int((y1 + y2) / 2)), 5, (0, 0, 255), cv.FILLED)
 
     ctime=time.time()
     frame_rates=int(1/(ctime-ptime))
