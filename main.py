@@ -4,12 +4,14 @@ import mediapipe as mp
 import numpy as np
 import math
 import os
+import keyboard
 # Volume Adjuster libraries:
 from ctypes import cast,POINTER
 from comtypes import CLSCTX_ALL
 from pycaw.pycaw import AudioUtilities,IAudioEndpointVolume
-
+import datetime
 import screen_brightness_control as sbc
+from PIL import ImageGrab
 
 devices=AudioUtilities.GetSpeakers()
 interface=devices.Activate(IAudioEndpointVolume._iid_,CLSCTX_ALL,None)
@@ -30,13 +32,17 @@ video=cv.VideoCapture(0)
 video.set(3,720)
 video.set(4,720)
 
-
+screen_ind=1
+today=datetime.date.today()
 hand=mpHand.Hands()
 lengths_sound=[]
 lengths_bright=[]
+screenshot_checkpoint1=False
+screenshot_checkpoint2=False
 flag_sound=False
 flag_bright=False
 while True:
+
     success,img=video.read()
     img_rgb=cv.cvtColor(img,cv.COLOR_BGR2RGB)
     img_h,img_w=img.shape[:2]
@@ -72,9 +78,12 @@ while True:
         x18, y18 = landmark[18]
         x19, y19 = landmark[19]
         x20, y20 = landmark[20]
-        margin=15
-        boundry=int(math.hypot(x9-x0,y9-y0))+margin
-        cv.circle(img,(x0,y0),int(boundry),(0,255,0),2)
+        margin=5
+        boundry=math.hypot(x9-x0,y9-y0)+margin
+        boundry2=int(math.hypot(x2-x1,y2-y1)+margin)
+        # # cv.circle(img,(x0,y0),int(boundry),(0,255,0),2)
+        # cv.circle(img, (x2, y2), boundry2, (0, 255, 0), 2)
+        # print(f"dist2_8:{math.hypot(x8-x2,y8-y2)} dist2_12:{math.hypot(x12-x2,y12-y2)} dist2_16:{math.hypot(x16-x2,y16-y2)}")
 
 
         dist_zeroth_finger={}
@@ -82,11 +91,12 @@ while True:
         for ind,(x,y) in landmark.items():
             if ind in tip_points:
                 dist_zeroth_finger[ind] = math.hypot(x - x0, y - y0)
+                
 
         #For sound Finger Number 8:
         distances=dist_zeroth_finger.copy()
         length_seq_sound=math.hypot(x8-x4,y8-y4)
-        if all(item<boundry for item in distances.values()):
+        if keyboard.is_pressed('w'):
             flag_sound=False
         pop_items=[]
         pop_items.append(distances.pop(8))
@@ -109,7 +119,7 @@ while True:
 
         ## For Brightness(40,350)
         distances=dist_zeroth_finger.copy()
-        if all(item<boundry for item in distances.values()):
+        if keyboard.is_pressed('w'):
             flag_bright=False
         pop_items=[]
         pop_items.append(distances.pop(8))
@@ -133,9 +143,54 @@ while True:
         #Sleep the PC:
         distances=dist_zeroth_finger.copy()
         pop_items=[]
+        pop_items.append(distances.pop(8))
+        if all(item>boundry for item in distances.values()) and all(item<boundry for item in pop_items):
+            if flag_sound!=True and flag_bright!=True:
+                os.system("rundll32.exe user32.dll,LockWorkStation")
+
+        #Restart the PC:
+        distances=dist_zeroth_finger.copy()
+        pop_items=[]
         pop_items.append(distances.pop(12))
         if all(item>boundry for item in distances.values()) and all(item<boundry for item in pop_items):
-            os.system("rundll32.exe powrprof.dll,SetSuspendState Sleep")
+            if flag_sound != True and flag_bright != True:
+                os.system("shutdown /r /t 10")
+
+        #Shut down the PC:
+        distances = dist_zeroth_finger.copy()
+        pop_items = []
+        pop_items.append(distances.pop(16))
+        if all(item > boundry for item in distances.values()) and all(item < boundry for item in pop_items):
+            if flag_sound != True and flag_bright != True:
+                os.system("shutdown /s /t 10")
+
+
+        # # Taking Screenshot:
+        distances=dist_zeroth_finger.copy()
+        pop_items=[]
+        pop_items.append(distances.pop(4))
+        # print(f"boundry: {boundry} dist:{pop_items[0]} chkpt1:{screenshot_checkpoint1} chkpt2:{screenshot_checkpoint2}")
+        if all(item<boundry for item in distances.values()):
+            screenshot_checkpoint1=True
+        if all(item>boundry for item in distances.values()):
+            if screenshot_checkpoint1:
+                screenshot_checkpoint2=True
+            else:
+                screenshot_checkpoint2=False
+        if screenshot_checkpoint1 and screenshot_checkpoint2:
+            screenshot=ImageGrab.grab()
+            screenshot.save(os.path.join(r"C:\Users\Hp\OneDrive\Pictures\Screenshots2",f"Screenshot_{today}_{screen_ind}.jpg"))
+            screen_ind+=1
+            screenshot_checkpoint1=False
+            screenshot_checkpoint2=False
+            print(f"Screenshot taken{screen_ind}")
+            # cv.putText(img,'Screenshot Captured!!',(30,50),cv.FONT_HERSHEY_PLAIN,2,(128,128,128),2)
+
+
+
+
+
+
 
 
     ctime=time.time()
